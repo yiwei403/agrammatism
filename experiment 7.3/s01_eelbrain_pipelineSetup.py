@@ -8,6 +8,8 @@ import pandas as pd
 import os
 import numpy as np
 
+# this is the version for HSP2025 poster results
+
 # the designed stimulus persentation time is 
 # 1000ms for the 1st fixation cross, 
 # 400ms for the 1st icon/picture,
@@ -79,6 +81,7 @@ class agrammatismMEG(MneExperiment):
     'left_hand': Group(['R3135', 'R3205', 'R3210']),
     }   
     
+    # Fixing the missing trigger event in R3161 iconfirst session. 
     def fix_events(self, ds):
         if ds.info['subject'] == 'R3161' and ds.info['session'] == 'iconfirst':
             df = ds.as_dataframe()
@@ -105,17 +108,19 @@ class agrammatismMEG(MneExperiment):
         'ica-picturefirst': RawICA('1-40', 'picturefirst', 'extended-infomax', n_components=0.99),
     }
     
+    # adding labels to trigger codes
+    # adding a trialindex column to assign a  trial index to every 4 trigger codes which belong to the same trial. 
     variables = {
         'stimulus': LabelVar('trigger', {163: 'fixation', 167: 'picture', 169: 'icon', 171: 'speak'}),
-        # 'trialindex': EvalVar("trigger.as_factor().count('163')"),
         'trialindex': EvalVar("trigger.as_factor().count()"),
-
     }
     
     # for icon first: irregular verbs are: trial: 25, 42, 46, 61, 75, 101, 113, 126, 144, 174, 182, 214, 286, 316, 360
     # for picture first: irregular verbs are: trial: 14, 75, 92, 96, 110, 161, 175, 216, 251, 263, 276, 294, 336, 374, 382
+    # see R__IF__.xlsx and R__PF__.xlsx for stimulus per trial. 
     def label_events(self, ds):
         
+        # add a verbType column to indicate whether a verb is regular or irregular
         ds['verbType'] = Factor(['']*len(ds['trialindex']), name='verbType')
         if ds.info['session'] == 'iconfirst':
             trial_order = iconfirst_trialOrder
@@ -140,7 +145,7 @@ class agrammatismMEG(MneExperiment):
         ds['wordCategory'] = Factor(wordCategories)
         ds['verbType'][(ds['wordType'] == 'infpst') & (ds['verbType'] != 'irregular')] = "regular"
         
-        # 
+        # add a rt column to record word onset time of each trial using their word onset time .csv file
         production_data_dir = '/Users/yiwei/Dropbox/agrammatism/MEGstudy/speechProductionData/'
         if ds.info['session'] == 'iconfirst':
             session = 'IF'
@@ -177,7 +182,9 @@ class agrammatismMEG(MneExperiment):
 
     
     # tmin = -0.1 by default
-    # the SecondaryEpochs are set up for running one sample t test. 
+    # the SecondaryEpochs are set up for running one sample t test.
+    # *_regular refers to epochs with only regular verbs
+    # *_irregular refers to epochs with only irregular verbs 
     epochs = {        
         'trial_iconfirst': PrimaryEpoch('iconfirst', "stimulus == 'fixation'", tmax = tmaxTrial),
         'trial_iconfirst_regular': PrimaryEpoch('iconfirst', "(stimulus == 'fixation') & (verbType!='irregular')", tmax = tmaxTrial),
@@ -199,12 +206,12 @@ class agrammatismMEG(MneExperiment):
         'trial_picturefirst': PrimaryEpoch('picturefirst', "stimulus == 'fixation'", tmax = tmaxTrial),
         'trial_picturefirst_regular': PrimaryEpoch('picturefirst', "(stimulus == 'fixation') & (verbType!='irregular')", tmax = tmaxTrial),
         'trial_picturefirst_irregular': PrimaryEpoch('picturefirst', "(stimulus == 'fixation') & (verbType!='regular')", tmax = tmaxTrial),
-        # 'nounControl_picturefirst': SecondaryEpoch('trial_picturefirst', sel="wordType == 'nouncontrol'"),
-        # 'nounNaming_picturefirst': SecondaryEpoch('trial_picturefirst', sel="wordType == 'nounnm'"),
+        'nounControl_picturefirst': SecondaryEpoch('trial_picturefirst', sel="wordType == 'nouncontrol'"),
+        'nounNaming_picturefirst': SecondaryEpoch('trial_picturefirst', sel="wordType == 'nounnm'"),
         # 'nounPlural_picturefirst': SecondaryEpoch('trial_picturefirst', sel="wordType == 'nounpp'"),
         # 'nounPhrase_picturefirst': SecondaryEpoch('trial_picturefirst', sel="wordType == 'nounpc'"),
-        # 'verbControl_picturefirst': SecondaryEpoch('trial_picturefirst', sel="wordType == 'verbcontrol'"),
-        # 'verbNaming_picturefirst': SecondaryEpoch('trial_picturefirst', sel="wordType == 'verbnm'"), 
+        'verbControl_picturefirst': SecondaryEpoch('trial_picturefirst', sel="wordType == 'verbcontrol'"),
+        'verbNaming_picturefirst': SecondaryEpoch('trial_picturefirst', sel="wordType == 'verbnm'"), 
         # 'verbInflect_picturefirst': SecondaryEpoch('trial_picturefirst', sel="wordType == 'verbinflect'"),
         'icon_picturefirst': PrimaryEpoch('picturefirst', "stimulus == 'icon'", tmin = 0, tmax = (400+15)/1000),
         'icon_picturefirst_long': PrimaryEpoch('picturefirst', "stimulus == 'icon'", tmin = 0, tmax = 0.8),
@@ -212,11 +219,13 @@ class agrammatismMEG(MneExperiment):
         'picture_picturefirst': PrimaryEpoch('picturefirst', "stimulus == 'picture'", tmin = 0, tmax = (400+15)/1000),
         'picture_picturefirst_long': PrimaryEpoch('picturefirst', "stimulus == 'picture'", tmin = 0, tmax = 0.8),
         'picture_picturefirst_long_regular': PrimaryEpoch('picturefirst', "(stimulus == 'picture') & (verbType!='irregular')", tmin = 0, tmax = 0.8),
-        'speak_picturefirst' : PrimaryEpoch('picturefirst', "(stimulus == 'speak') & (accuracy == 'correct')", trigger_shift = 'rt', tmin = -1, tmax = 1),
-        'speak_picturefirst_regular' : PrimaryEpoch('picturefirst', "(stimulus == 'speak') & (accuracy == 'correct') & (verbType!='irregular')", trigger_shift = 'rt', tmin = -1, tmax = 1),
-        'speak_picturefirst_irregular' : PrimaryEpoch('picturefirst', "(stimulus == 'speak') & (accuracy == 'correct') & (verbType!='regular')", trigger_shift = 'rt', tmin = -1, tmax = 1),
+        'speak_picturefirst' : PrimaryEpoch('picturefirst', "(stimulus == 'speak') & (accuracy == 'correct')", trigger_shift = 'rt', tmin = -1.5, tmax = 0.2),
+        'speak_picturefirst_regular' : PrimaryEpoch('picturefirst', "(stimulus == 'speak') & (accuracy == 'correct') & (verbType!='irregular')", trigger_shift = 'rt', tmin = -1.5, tmax = 0.2),
+        'speak_picturefirst_irregular' : PrimaryEpoch('picturefirst', "(stimulus == 'speak') & (accuracy == 'correct') & (verbType!='regular')", trigger_shift = 'rt', tmin = -1.5, tmax = 0.2),
     }
     
+    # I didn't predefine VectorDifferenceRelated and Vector tests for volumn source space here, but one could
+    # (I used them directly in the s05_eelbrain_analysis_volume_source.ipynb script)
     tests = {
         '=0': TTestOneSample(),
         'nounNaming-nounControl': TTestRelated('wordType', 'nounnm', 'nouncontrol'),
@@ -233,8 +242,6 @@ class agrammatismMEG(MneExperiment):
         'verbInflectPast-verbNaming': TTestRelated('wordType', 'infpst', 'verbnm'),
         'verbInflectFuture-verbNaming': TTestRelated('wordType', 'inffut', 'verbnm'),
         'verbInflectPast-verbInflectFuture': TTestRelated('wordType', 'infpst', 'inffut'),
-        # 'verbControl-nounControl': TTestRelated('wordType', 'verbcontrol', 'nouncontrol'), 
-        # 'verbNaming-nounNaming': TTestRelated('wordType', 'verbnm', 'nounnm'),
     }
 
     parcs = {
@@ -268,10 +275,6 @@ class agrammatismMEG(MneExperiment):
         }
     
     
-# 'frontal-temporal-lh': SubParc('PALS_B12_Lobes', ('LOBE.FRONTAL-lh', 'LOBE.TEMPORAL-lh')),
-
-    
-# maybe set tmax back to tamx = (1000+12+400+15+400+15+600)/1000 after comparing ICA and emg epochs.  
 # maybe use the last 100ms of the fixation time as baseline for everything. 
 data_path = '/Users/yiwei/Documents/agrammatism/MEGstudy'
 megData = agrammatismMEG(data_path) 
